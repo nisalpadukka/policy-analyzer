@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Privacy Policy Analyzer</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+  <img src="assets/icons/icon48.png" alt="Privacy Policy Analyzer logo" class="logo" />
+  <h1 class="title">Privacy Policy Analyzer</h1>
+</div>
+
+    <section class="section">
+      <h2 class="section-title">Selected text</h2>
+      <textarea id="selectedText"></textarea>
+    </section>
+
+    <button id="summarizeBtn">Summarize</button>
+    <div id="status" class="status"></div>
+
+    <section class="section">
+      <h2 class="section-title">Summary</h2>
+
+      <div class="summary-block">
+        <h3>
+          Data Collection
+          <span id="collectionSeverity" class="badge"></span>
+        </h3>
+        <p id="collectionText"></p>
+      </div>
+
+      <div class="summary-block">
+        <h3>
+          Data Sharing
+          <span id="sharingSeverity" class="badge"></span>
+        </h3>
+        <p id="sharingText"></p>
+      </div>
+
+      <div class="summary-block">
+        <h3>
+          Data Retention
+          <span id="retentionSeverity" class="badge"></span>
+        </h3>
+        <p id="retentionText"></p>
+      </div>
+
+      <div class="summary-block overall">
+        <h3>
+          Overall Privacy Risk
+          <span id="overallSeverity" class="badge"></span>
+        </h3>
+        <p id="overallText"></p>
+      </div>
+    </section>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
