@@ -6,8 +6,7 @@
 const ext = typeof browser !== "undefined" ? browser : chrome;
 
 // TODO: put your real API Gateway / Lambda URL here
-const ANALYSIS_API_URL =
-  "https://abc123xyz.execute-api.ca-central-1.amazonaws.com/prod/analyz";
+const ANALYSIS_API_URL = "https://0blnamny05.execute-api.us-east-1.amazonaws.com/analyze";
 
 ext.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "SUMMARIZE_POLICY") {
