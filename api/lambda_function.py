@@ -39,7 +39,8 @@ def get_completion_from_messages(messages, model="gpt-5.1"):
         model=model,
         messages=messages,
         temperature=0,   # deterministic / less “creative”
-        top_p=0.1
+        top_p=1,
+        seed=42,
     )
     logger.info(f"OpenAI raw response: {response.model_dump_json(indent=2)}")
     return response.choices[0].message.content
@@ -52,39 +53,83 @@ def create_analysis_prompt(policy_text: str):
     system_message = f"""
     You will be given privacy policy text inside {delimiter} characters.
 
-    Analyze ONLY the text inside the delimiters.   
+    Analyze ONLY the text inside the delimiters.
     If something is not directly stated, output: "Not specified".
 
-    Your output MUST be a single valid JSON object with this exact structure:
+    Your analysis MUST follow NIST Privacy Framework (v1.0) ideas of privacy risk,
+    but use the following **conservative** rules so that not every policy is rated High:
+
+    DATA COLLECTION SEVERITY (what data is collected):
+    - High: The policy clearly collects multiple highly sensitive elements
+      (e.g., health + biometrics + precise location + detailed behavioral tracking across
+      sites/apps, or sells/uses them for profiling), OR explicitly combines many data
+      sources for extensive profiling.
+    - Medium: The policy collects some sensitive data (e.g., financial, basic health,
+      or precise location) OR a broad mix of contact, usage, and tracking data typical
+      for large online services or banks.
+    - Low: Only minimal, non-sensitive data (e.g., email, basic account info) and
+      no strong tracking, profiling, biometrics, or health data.
+
+    DATA SHARING SEVERITY (who receives data):
+    - High: The policy clearly says data may be sold, rented, or shared broadly for
+      advertising/behavioral profiling, OR shared with many unrelated third parties
+      beyond what is reasonably necessary (e.g., vague sharing with "partners" for
+      marketing, data brokers, etc.).
+    - Medium: Data is shared with service providers, affiliates, regulators, payment
+      networks, or other entities necessary to provide the service, prevent fraud, or
+      comply with law, but no explicit "selling" or broad advertising sale of personal data.
+    - Low: No external sharing is mentioned, or sharing is strictly internal to the same
+      organization.
+
+    DATA RETENTION SEVERITY (how long it is kept):
+    - High: The policy clearly suggests indefinite retention (e.g., "as long as we choose"
+      or no meaningful limits) for most data categories.
+    - Medium: Retention is described in general or vague terms (e.g., "as long as needed
+      to provide services or meet legal obligations") without clear numeric limits.
+    - Low: Clear numeric retention limits are given (e.g., "kept for 2 years then deleted/
+      anonymized") for most data categories.
+
+    OVERALL PRIVACY RISK (user-facing risk score):
+    - High: At least TWO of the three categories (data_collecting, data_sharing,
+      data_retention) are rated High.
+    - Medium: Any other combination that includes at least one Medium, and no more than
+      one High.
+    - Low: All three categories are Low.
+
+    If you are unsure between Medium and High, choose MEDIUM.
+    If you are unsure between Medium and Low, choose MEDIUM.
+
+    Your output MUST be a single valid JSON object with this structure:
 
     {{
         "data_collecting": {{
-            "details": "Summary of data types explicitly stated in the policy comma separated list. If none are stated, write 'Not specified'.",
+            "details": "Very short summary (max 100 words) of the types of data explicitly collected. If none stated, write 'Not specified'.",
             "severity": "Low" or "Medium" or "High"
         }},
         "data_sharing": {{
-            "details": "Summary of who data is shared with, based ONLY on what is explicitly written in a once sentence. If not stated, write 'Not specified'.",
+            "details": "Very short summary (max 100 words) of who the data is shared with, based ONLY on what is explicitly written. If not stated, write 'Not specified'.",
             "severity": "Low" or "Medium" or "High"
         }},
         "data_retention": {{
-            "details": "State ONLY the retention period explicitly written in the text. If it's vague mention vary. If the policy does NOT contain a numeric time period (e.g., a number AND a time unit), write 'Not specified'. Never guess or invent time periods.",
+            "details": "State ONLY the retention period explicitly written in the text. If vague, write 'varies'. If no numeric duration is provided, write 'Not specified'. Max 100 words.",
             "severity": "Low" or "Medium" or "High"
         }},
         "overall_privacy_risk": "Low" or "Medium" or "High"
     }}
 
     STRICT RULES:
-    - Do NOT add any explanation outside the JSON.
+    - Each 'details' field MUST NOT exceed 100 words.
+    - Do NOT add explanations outside the JSON.
+    - Apply the conservative rules above; default to MEDIUM when in doubt.
     """
 
     user_message = f"{delimiter}{policy_text}{delimiter}"
 
-    messages = [
+    return [
         {"role": "system", "content": system_message},
         {"role": "user", "content": user_message}
     ]
 
-    return messages
 
 
 def lambda_handler(event, context):
@@ -103,6 +148,27 @@ def lambda_handler(event, context):
     request_id = getattr(context, "aws_request_id", "local-test")
     logger.info(f"Request ID: {request_id}")
 
+    # Handle CORS preflight OPTIONS request
+    if event.get("requestContext", {}).get("http", {}).get("method") == "OPTIONS":
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Amz-Date, X-Api-Key",
+                "Access-Control-Max-Age": "300"
+            },
+            "body": ""
+        }
+
+    # Common CORS headers
+    cors_headers = {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Amz-Date, X-Api-Key"
+    }
+
     try:
         # Parse request body
         body = parse_request_body(event)
@@ -112,10 +178,7 @@ def lambda_handler(event, context):
             logger.warning("No policy text provided in request")
             return {
                 "statusCode": 400,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*"
-                },
+                "headers": cors_headers,
                 "body": json.dumps({
                     "message": "Missing required field: policy_text",
                     "status": "error"
@@ -171,10 +234,7 @@ def lambda_handler(event, context):
 
         response = {
             "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            },
+            "headers": cors_headers,
             "body": json.dumps(response_body)
         }
 
@@ -186,10 +246,7 @@ def lambda_handler(event, context):
 
         response = {
             "statusCode": 500,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            },
+            "headers": cors_headers,
             "body": json.dumps({
                 "message": "Error analyzing privacy policy",
                 "error": str(e),

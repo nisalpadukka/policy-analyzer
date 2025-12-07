@@ -2,13 +2,7 @@
   "manifest_version": 3,
   "name": "Privacy Policy Analyzer",
   "version": "0.1.0",
-  "description": "Browser extension that summarizes selected privacy policy text into key points about collection, sharing, retention and overall risk.",
-  "permissions": [
-    "activeTab"
-  ],
-  "host_permissions": [
-    "<all_urls>"
-  ],
+  "description": "Browser extension that summarizes privacy policy text",
   "action": {
   "default_popup": "popup.html",
   "default_icon": {
@@ -17,17 +11,6 @@
     "128": "assets/icons/icon128.png"
   }
 },
-  "content_scripts": [
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "content.js"
-      ],
-      "run_at": "document_idle"
-    }
-  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"

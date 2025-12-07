@@ -40,8 +40,6 @@ ext.runtime.onMessage.addListener((request, sender, sendResponse) => {
  */
 async function summarizeViaBackend(policyText) {
   const trimmed = policyText.trim();
-  const truncated =
-    trimmed.length > 3000 ? trimmed.slice(0, 3000) : trimmed || "No text provided.";
 
   if (!ANALYSIS_API_URL || ANALYSIS_API_URL.startsWith("https://YOUR-API-ID")) {
     throw new Error("ANALYSIS_API_URL is not set.");
@@ -52,7 +50,7 @@ async function summarizeViaBackend(policyText) {
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ policy_text: truncated })
+    body: JSON.stringify({ policy_text: trimmed })
   });
 
   if (!resp.ok) {
@@ -78,7 +76,7 @@ async function summarizeViaBackend(policyText) {
     typeof val === "string" ? val.toLowerCase() : "";
 
   return {
-    originalExcerpt: truncated,
+    originalExcerpt: trimmed,
     collection: {
       text: collect.details || "Not specified",
       severity: normaliseSeverity(collect.severity)

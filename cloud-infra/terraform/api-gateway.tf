@@ -1,8 +1,15 @@
-# API Gateway HTTP API
+# API Gateway HTTP API with CORS configuration
 resource "aws_apigatewayv2_api" "main" {
   name          = "${var.project_name}-api"
   protocol_type = "HTTP"
   description   = "API Gateway for ${var.project_name}"
+
+  cors_configuration {
+    allow_origins = ["*"]
+    allow_methods = ["POST", "OPTIONS"]
+    allow_headers = ["content-type", "x-amz-date", "authorization", "x-api-key"]
+    max_age       = 300
+  }
 }
 
 # Lambda integration
